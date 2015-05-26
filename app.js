@@ -67,7 +67,7 @@ function csvJSON(csv) {
         }
 
 
-    }``
+    }
 
     //return result; //JavaScript object
     return result; //JSON
