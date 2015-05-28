@@ -20,7 +20,8 @@ server.use( function crossOrigin(req,res,next){
 
 server.get('/', function(sreq, sres, snext){
     sres.contentType = 'json';
-    client.get('/data/pricefile.dat?_=1432600394468', function(err, req) {
+    // console.log(Date.now());
+    client.get('/data/pricefile.dat?_='+Date.now(), function(err, req) {
         assert.ifError(err); // connection error
 
         req.on('result', function(err, res) {
@@ -33,7 +34,7 @@ server.get('/', function(sreq, sres, snext){
             });
 
             res.on('end', function() {
-                console.log(res.body);
+                // console.log(res.body);
                 sres.send(csvJSON(res.body));
                 snext();
             });
