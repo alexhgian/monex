@@ -1,11 +1,14 @@
 var restify = require('restify');
 var assert = require('assert');
-
+var cheerio = require('cheerio');
 // Creates a JSON client
 var client = restify.createClient({
     url: 'http://www.monex.com'
 });
-
+// Creates a JSON client
+var client2 = restify.createClient({
+    url: 'http://integration.nfusionsolutions.biz'
+});
 
 
 var server = restify.createServer();
@@ -43,6 +46,47 @@ server.get('/', function(sreq, sres, snext){
 
 
 
+});
+
+// Scrapper for JMBullion
+// Returns an array with 4 objects
+// Gold, Silver, Platinum and Bitcoin
+server.get('/jm', function(sreq, sres, snext){
+    sres.contentType = 'json';
+    // console.log(Date.now());
+    client2.get('/client/jmbullion/module/largehistoricalchart2/nflargehist?metal=gold&xdm_e=http%3A%2F%2Fwww.jmbullion.com&xdm_c=default4389&xdm_p=1', function(err, req) {
+        assert.ifError(err); // connection error
+
+        req.on('result', function(err, res) {
+            assert.ifError(err); // HTTP status code >= 400
+
+            res.body = '';
+            res.setEncoding('utf8');
+            res.on('data', function(chunk) {
+                res.body += chunk;
+            });
+
+            res.on('end', function() {
+                var tmp = [];
+
+                // Create a javascript DOM since node doesn't have one
+                var $ = cheerio.load(res.body);
+                var metals = $('.metals');
+
+                // Loop through each li element which contains the data we need
+                metals.children('li').each(function(i, elem){
+                    // Parse the string into a proper JSON object
+                    var parsedMetal = JSON.parse($(this).attr('data-quote'));
+                    console.log(parsedMetal);
+                    tmp.push(parsedMetal);
+                });
+
+                // Send it out to our app to use
+                sres.send(tmp);
+                snext(tmp);
+            });
+        });
+    });
 });
 
 //var csv is the CSV file with headers
