@@ -1,16 +1,18 @@
 var restify = require('restify');
 var assert = require('assert');
 var cheerio = require('cheerio');
-// Creates a JSON client
+
+// Creates a client for monex.com
 var client = restify.createClient({
     url: 'http://www.monex.com'
 });
-// Creates a JSON client
+
+// Creates a client for jmbullion 3rd party service
 var client2 = restify.createClient({
     url: 'http://integration.nfusionsolutions.biz'
 });
 
-
+// Create our server so we can access the processed data
 var server = restify.createServer();
 
 //Allow Cross Origin Requests
@@ -21,39 +23,12 @@ server.use( function crossOrigin(req,res,next){
     return next();
 });
 
-server.get('/', function(sreq, sres, snext){
-    sres.contentType = 'json';
-    // console.log(Date.now());
-    client.get('/data/pricefile.dat?_='+Date.now(), function(err, req) {
-        assert.ifError(err); // connection error
-
-        req.on('result', function(err, res) {
-            assert.ifError(err); // HTTP status code >= 400
-
-            res.body = '';
-            res.setEncoding('utf8');
-            res.on('data', function(chunk) {
-                res.body += chunk;
-            });
-
-            res.on('end', function() {
-                // console.log(res.body);
-                sres.send(csvJSON(res.body));
-                snext();
-            });
-        });
-    });
-
-
-
-});
 
 // Scrapper for JMBullion
 // Returns an array with 4 objects
 // Gold, Silver, Platinum and Bitcoin
 server.get('/jm', function(sreq, sres, snext){
     sres.contentType = 'json';
-    // console.log(Date.now());
     client2.get('/client/jmbullion/module/largehistoricalchart2/nflargehist?metal=gold&xdm_e=http%3A%2F%2Fwww.jmbullion.com&xdm_c=default4389&xdm_p=1', function(err, req) {
         assert.ifError(err); // connection error
 
@@ -83,20 +58,42 @@ server.get('/jm', function(sreq, sres, snext){
 
                 // Send it out to our app to use
                 sres.send(tmp);
-                snext(tmp);
+                snext();
             });
         });
     });
 });
 
-//var csv is the CSV file with headers
+
+// Monex.com which returns a CSV file named .dat which has live bidding prices
+server.get('/mx', function(sreq, sres, snext){
+    sres.contentType = 'json';
+    client.get('/data/pricefile.dat?_='+Date.now(), function(err, req) {
+        assert.ifError(err); // connection error
+
+        req.on('result', function(err, res) {
+            assert.ifError(err); // HTTP status code >= 400
+
+            res.body = '';
+            res.setEncoding('utf8');
+            res.on('data', function(chunk) {
+                res.body += chunk;
+            });
+
+            res.on('end', function() {
+                sres.send(csvJSON(res.body));
+                snext();
+            });
+        });
+    });
+});
+
+//CSV to JSON used in the monex scrapper
 function csvJSON(csv) {
 
     var lines = csv.split("\n");
 
     var result = [];
-
-    // var headers = lines[0]='name';
 
     for (var i = 1; i < lines.length; i++) {
         var obj = {};
@@ -110,14 +107,11 @@ function csvJSON(csv) {
             obj['ask'] = currentline[6];
             result.push(obj);
         }
-
-
     }
-
-    //return result; //JavaScript object
     return result; //JSON
 }
 
+// Start the server
 var port = process.env.PORT || 8080;
 server.listen(port, function() {
     console.log('%s listening at %s', server.name, server.url);
